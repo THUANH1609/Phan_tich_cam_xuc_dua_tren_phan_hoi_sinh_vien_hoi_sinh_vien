@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo phân tích phản hồi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Background gradient */
+    body { 
+      min-height: 100vh;
+      background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%, #f0fdf4 100%);
+      padding: 24px;
+    }
+    /* Card styling with hover */
+    .card { border-radius: 14px; border: 0; box-shadow: 0 6px 18px rgba(2,6,23,0.06); transition: transform .15s ease, box-shadow .15s ease; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(2,6,23,0.12); }
+    /* KPI cards */
+    .kpi { border-radius: 14px; backdrop-filter: blur(2px); }
+    .kpi-muted { background: #eef2ff; }
+    .kpi-pos { background: #dcfce7; }
+    .kpi-neg { background: #fee2e2; }
+    .kpi .h4 { margin: 0; font-weight: 700; }
+    /* Table tweaks */
+    table.table tr:hover { background: #f8fafc; }
+    thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+    /* Small badges */
+    .badge-soft { background: #e2e8f0; color: #0f172a; }
+    /* Mono font */
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h3 class="mb-3 text-primary">PHÂN TÍCH PHẢN HỒI SINH VIÊN</h3>
+
+    <ul class="nav nav-tabs" id="tabNav" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-pane" type="button" role="tab">Nhập Text</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-pane" type="button" role="tab">Upload File</button>
+      </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+      <!-- Text analyze -->
+      <div class="tab-pane fade show active" id="text-pane" role="tabpanel">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Phản hồi của sinh viên</label>
+              <textarea id="txt-input" class="form-control" rows="4" ></textarea>
+            </div>
+            <button id="btn-analyze-text" class="btn btn-primary">Phân tích</button>
+            <div id="text-error" class="text-danger mt-2" style="display:none;"></div>
+            <hr/>
+            <h6>Kết quả:</h6>
+            <div id="text-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File analyze -->
+      <div class="tab-pane fade" id="file-pane" role="tabpanel">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-6">
+                <label class="form-label">Chọn file Excel/CSV</label>
+                <input id="file-input" type="file" class="form-control" accept=".xlsx,.xls,.csv" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Tên cột chứa phản hồi</label>
+                <input id="file-column" type="text" class="form-control" placeholder="Mặc định: Phản hồi" />
+              </div>
+              <div class="col-md-2 text-end">
+                <button id="btn-analyze-file" class="btn btn-primary w-100">Phân tích</button>
+              </div>
+            </div>
+            <div id="file-error" class="text-danger mt-2" style="display:none;"></div>
+
+            <hr/>
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-4">
+                    <label class="form-label">Lọc theo Sheet</label>
+                    <select id="filter-sheet" class="form-select">
+                      <option value="all">Tất cả</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Lọc theo Chủ đề</label>
+                    <select id="filter-topic" class="form-select">
+                      <option value="all">Tất cả</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2 text-end">
+                    <button id="btn-apply-filter" class="btn btn-outline-primary w-100">Lọc</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <div class="kpi kpi-muted p-3 text-center"><div class="text-secondary">Tổng phần</div><div class="h4" id="kpi-total-parts">0</div></div>
+              </div>
+              <div class="col-md-4">
+                <div class="kpi kpi-pos p-3 text-center"><div class="text-success">Tích cực</div><div class="h4" id="kpi-pos">0</div></div>
+              </div>
+              <div class="col-md-4">
+                <div class="kpi kpi-neg p-3 text-center"><div class="text-danger">Tiêu cực</div><div class="h4" id="kpi-neg">0</div></div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <h6 class="text-primary">Tổng hợp theo Chủ đề x Cảm xúc</h6>
+                <canvas id="file-chart" height="160"></canvas>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-primary">Bảng tóm tắt</h6>
+                <div class="table-responsive">
+                  <table class="table table-striped" id="file-table">
+                    <thead>
+                      <tr><th>Chủ đề</th><th>Tích cực</th><th>Trung lập</th><th>Tiêu cực</th><th>Tổng</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <hr/>
+            <h6 class="text-primary">Chi tiết (Mã SV, Phản hồi, Chủ đề, Cảm xúc)</h6>
+            <div class="table-responsive">
+              <table class="table table-bordered" id="file-rows">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Mã sinh viên</th>
+                    <th>Phản hồi</th>
+                    <th>Chủ đề</th>
+                    <th>Cảm xúc</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <nav class="mt-2">
+                <ul class="pagination justify-content-end" id="pager"></ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_ANALYZE_TEXT = 'http://127.0.0.1:8000/analyze_text/';
+    const API_ANALYZE_FILE = 'http://127.0.0.1:8000/analyze_file';
+    let lastData = null; // lưu dữ liệu để lọc lại không cần upload
+    let filteredCache = []; // cache các dòng sau lọc để phân trang
+    let currentPage = 1;
+    const pageSize = 5;
+
+    // Analyze text
+    const showLoading = ()=>{}; // disabled
+
+    document.getElementById('btn-analyze-text').addEventListener('click', async () => {
+      const text = document.getElementById('txt-input').value.trim();
+      const err = document.getElementById('text-error');
+      const out = document.getElementById('text-results');
+      err.style.display = 'none'; out.innerHTML = '';
+      if (!text) { err.textContent = 'Vui lòng nhập nội dung.'; err.style.display = 'block'; return; }
+      try {
+        showLoading(true);
+        const res = await fetch(API_ANALYZE_TEXT, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        if (!data.analysis_parts || data.analysis_parts.length === 0) { out.innerHTML = '<p class="text-muted">Không tách được phần nào.</p>'; return; }
+        const list = document.createElement('div');
+        data.analysis_parts.forEach((p, i) => {
+          const card = document.createElement('div');
+          card.className = 'p-2 mb-2 border rounded';
+          card.innerHTML = `<div class="mono">${i+1}. ${p.part}</div>
+                            <span class="badge bg-primary">${p.topic}</span>
+                            <span class="badge ${p.sentiment.toLowerCase().includes('tích cực')||p.sentiment.toLowerCase().includes('positive')?'bg-success':(p.sentiment.toLowerCase().includes('tiêu cực')||p.sentiment.toLowerCase().includes('negative')?'bg-danger':'bg-warning text-dark')}">${p.sentiment}</span>`;
+          list.appendChild(card);
+        });
+        out.appendChild(list);
+      } catch (e) {
+        err.textContent = 'Lỗi: ' + e.message; err.style.display = 'block';
+      } finally { showLoading(false); }
+    });
+
+    // Analyze file
+    let fileChart;
+    document.getElementById('btn-analyze-file').addEventListener('click', async () => {
+      const f = document.getElementById('file-input').files[0];
+      const col = document.getElementById('file-column').value.trim();
+      const err = document.getElementById('file-error');
+      err.style.display = 'none';
+      if (!f) { err.textContent = 'Vui lòng chọn file.'; err.style.display = 'block'; return; }
+      const fd = new FormData();
+      fd.append('file', f);
+      if (col) fd.append('text_column', col);
+      try {
+        showLoading(true);
+        const res = await fetch(API_ANALYZE_FILE, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { throw new Error(data.detail || 'Server error'); }
+        lastData = data;
+        populateSheetOptions(data);
+        populateTopicOptions(data);
+        currentPage = 1;
+        renderFiltered();
+      } catch (e) {
+        err.textContent = 'Lỗi: ' + e.message; err.style.display = 'block';
+      } finally { showLoading(false); }
+    });
+
+    // Apply filter events
+    document.getElementById('btn-apply-filter').addEventListener('click', () => { currentPage = 1; renderFiltered(); });
+    document.getElementById('filter-sheet').addEventListener('change', () => { currentPage = 1; renderFiltered(); });
+    document.getElementById('filter-topic').addEventListener('change', () => { currentPage = 1; renderFiltered(); });
+
+    function renderFileSummary(data){
+      const agg = data.summary?.topic_sentiment || {};
+      const labels = Object.keys(agg);
+      const pos = labels.map(k => agg[k].pos || 0);
+      const neu = labels.map(k => agg[k].neu || 0);
+      const neg = labels.map(k => agg[k].neg || 0);
+
+      // table
+      const tbody = document.querySelector('#file-table tbody');
+      tbody.innerHTML = '';
+      labels.forEach(k => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${k}</td><td>${agg[k].pos||0}</td><td>${agg[k].neu||0}</td><td>${agg[k].neg||0}</td><td>${(agg[k].pos||0)+(agg[k].neu||0)+(agg[k].neg||0)}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      // chart
+      const ctx = document.getElementById('file-chart').getContext('2d');
+      if (fileChart) fileChart.destroy();
+      fileChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [
+          { label: 'Tích cực', data: pos, backgroundColor: '#22c55e' },
+          { label: 'Trung lập', data: neu, backgroundColor: '#f59e0b' },
+          { label: 'Tiêu cực', data: neg, backgroundColor: '#ef4444' }
+        ]},
+        options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+      });
+
+      // KPI
+      const totalParts = pos.reduce((a,b)=>a+b,0)+neu.reduce((a,b)=>a+b,0)+neg.reduce((a,b)=>a+b,0);
+      document.getElementById('kpi-total-parts').textContent = totalParts;
+      document.getElementById('kpi-pos').textContent = pos.reduce((a,b)=>a+b,0);
+      document.getElementById('kpi-neg').textContent = neg.reduce((a,b)=>a+b,0);
+    }
+
+    function renderFileRows(data){
+      const tbody = document.querySelector('#file-rows tbody');
+      tbody.innerHTML = '';
+      (data.rows || []).forEach(row => {
+        if (!row.analysis_parts || row.analysis_parts.length === 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${row.index+1}</td><td>${row.student_id||''}</td><td>${row.original_text}</td><td colspan="2" class="text-muted">(Không tách được)</td>`;
+          tbody.appendChild(tr);
+        } else {
+          row.analysis_parts.forEach((p, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${row.index+1}${p.part?'.'+(i+1):''}</td>
+                            <td>${row.student_id||''}</td>
+                            <td>${row.original_text}</td>
+                            <td>${p.topic}</td>
+                            <td>${p.sentiment}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+      });
+    }
+
+    function renderPagination(totalRows){
+      const pager = document.getElementById('pager');
+      pager.innerHTML = '';
+      const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+      const addItem = (label, page, disabled=false, active=false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${disabled?'disabled':''} ${active?'active':''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link'; a.href = '#'; a.textContent = label;
+        a.onclick = (e)=>{ e.preventDefault(); if (!disabled && currentPage!==page){ currentPage = page; renderFiltered(); } };
+        li.appendChild(a); pager.appendChild(li);
+      };
+      addItem('‹', Math.max(1, currentPage-1), currentPage===1, false);
+      const windowSize = 5;
+      let start = Math.max(1, currentPage - 2);
+      let end = Math.min(totalPages, start + windowSize - 1);
+      if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
+      if (start > 1){ addItem('1', 1, false, currentPage===1); if (start>2){ const li=document.createElement('li'); li.className='page-item disabled'; li.innerHTML='<span class="page-link">…</span>'; pager.appendChild(li);} }
+      for (let p=start; p<=end; p++){ addItem(String(p), p, false, currentPage===p); }
+      if (end < totalPages){ if (end<totalPages-1){ const li=document.createElement('li'); li.className='page-item disabled'; li.innerHTML='<span class="page-link">…</span>'; pager.appendChild(li);} addItem(String(totalPages), totalPages, false, currentPage===totalPages); }
+      addItem('›', Math.min(totalPages, currentPage+1), currentPage===totalPages, false);
+    }
+
+    // Populate topic select based on data
+    function populateTopicOptions(data){
+      const agg = data.summary?.topic_sentiment || {};
+      const sel = document.getElementById('filter-topic');
+      sel.innerHTML = '<option value="all">Tất cả</option>' + Object.keys(agg).map(k=>`<option value="${k}">${k}</option>`).join('');
+    }
+
+    // Populate sheet select
+    function populateSheetOptions(data){
+      const sheets = Array.isArray(data.sheets) ? data.sheets : [];
+      const sel = document.getElementById('filter-sheet');
+      sel.innerHTML = '<option value="all">Tất cả</option>' + sheets.map(s=>`<option value="${s}">${s}</option>`).join('');
+    }
+
+    // Build filtered aggregation and rows
+    function buildFiltered(data){
+      const topic = document.getElementById('filter-topic').value || 'all';
+      const sheet = document.getElementById('filter-sheet').value || 'all';
+      const filteredRows = [];
+      const agg = {};
+      (data.rows||[]).forEach(row => {
+        if (sheet !== 'all' && (row.sheet||'') !== sheet) return;
+        const parts = (row.analysis_parts||[]).filter(p => (topic==='all' || p.topic===topic));
+        if (parts.length>0){
+          filteredRows.push({ index: row.index, original_text: row.original_text, analysis_parts: parts });
+          parts.forEach(p => {
+            const t = p.topic || 'Khác';
+            if (!agg[t]) agg[t] = {pos:0,neu:0,neg:0};
+            const s = (p.sentiment||'').toLowerCase();
+            if (s.includes('tích cực') || s.includes('positive')) agg[t].pos++;
+            else if (s.includes('tiêu cực') || s.includes('negative')) agg[t].neg++;
+            else agg[t].neu++;
+          });
+        }
+      });
+      return { agg, rows: filteredRows };
+    }
+
+    function renderFiltered(){
+      if (!lastData) return;
+      const {agg, rows} = buildFiltered(lastData);
+      filteredCache = rows;
+      const start = (currentPage-1)*pageSize;
+      const pageRows = rows.slice(start, start+pageSize);
+      // render summary and rows from filtered
+      renderFileSummary({ summary: { topic_sentiment: agg } });
+      renderFileRows({ rows: pageRows });
+      renderPagination(rows.length);
+    }
+  </script>
+</body>
+</html>
