@@ -1,4 +1,5 @@
-<h1 align="center">PHÂN TÍCH CẢM XÚC DỰA TRÊN PHẢN HỒI SINH VIÊN </h1>
+# PHÂN TÍCH CẢM XÚC DỰA TRÊN PHẢN HỒI SINH VIÊN
+
 <div align="center">
 
 <p align="center">
@@ -6,83 +7,209 @@
   <img src="./img/LogoAIoTLab.png" alt="AIoTLab Logo" width="170"/>
 </p>
 
-[![Made by AIoTLab](https://img.shields.io/badge/Made%20by%20AIoTLab-blue?style=for-the-badge)](https://www.facebook.com/DNUAIoTLab)
-[![Fit DNU](https://img.shields.io/badge/Fit%20DNU-green?style=for-the-badge)](https://fitdnu.net/)
+[![Made by AIoTLab](https://img.shields.io/badge/Made%20by%20AIoTLab-blue?style=for-the-badge)](https://www.facebook.com/DNUAIoTLab)  
+[![Fit DNU](https://img.shields.io/badge/Fit%20DNU-green?style=for-the-badge)](https://fitdnu.net/)  
 [![DaiNam University](https://img.shields.io/badge/DaiNam%20University-red?style=for-the-badge)](https://dainam.edu.vn)
 
 </div>
 
-🌟 Introduction
+---
 
-- Student Sentiment Analysis là hệ thống phân tích cảm xúc trong phản hồi của sinh viên, giúp nhà trường đánh giá mức độ hài lòng và phát hiện sớm các vấn đề trong quá trình học tập.
+## 1. Giới thiệu
 
-- Hệ thống kết hợp sức mạnh của PHoBERT – mô hình ngôn ngữ mạnh mẽ cho tiếng Việt – cùng CNN và GRU để phát hiện cụm từ mang tính cảm xúc (“chưa hiểu”, “rất hay”, “khó tiếp thu”…), đồng thời nắm bắt ngữ cảnh của toàn câu để phân loại cảm xúc chính xác hơn.
+Hệ thống **phân tích phản hồi sinh viên** giúp:
 
-- Các nhãn cảm xúc được chia thành ba nhóm chính:
+- Phân loại **cảm xúc**: 😡 Tiêu cực – 😐 Trung lập – 😊 Tích cực  
+- Nhận diện **chủ đề góp ý**:
+  - 🧑‍🏫 Giảng viên  
+  - 📘 Chương trình học  
+  - 🏫 Cơ sở vật chất  
+  - 💻 Học liệu / Website  
 
-😃 Tích cực (Positive)
+Hệ thống sử dụng:
 
-😐 Trung tính (Neutral)
-
-😞 Tiêu cực (Negative)
+- **PHoBERT** để sinh embedding tiếng Việt.
+- **CNN + GRU** cho phân tích cảm xúc.
+- **GRU** cho phân tích chủ đề.
+- Tích hợp vào **API FastAPI**, hỗ trợ phân tích:
+  - Một câu phản hồi.
+  - Nhiều phản hồi trong file Excel/CSV.
+  - Dữ liệu khảo sát (Likert + câu hỏi mở).
 
 ---
-## ⚙ System Overview
-### 🧠 Mô hình đề xuất
 
-- PHoBERT: Sinh embedding ngữ cảnh tiếng Việt.
+## 2. Kiến trúc hệ thống
 
-- CNN (Convolutional Neural Network): Phát hiện các cụm từ đặc trưng cảm xúc.
-
-- GRU (Gated Recurrent Unit): Nắm bắt mối quan hệ chuỗi trong câu phản hồi.
-
-- Kết hợp CNN-GRU: Giúp mô hình vừa học được đặc trưng cục bộ vừa hiểu được ngữ cảnh tổng thể, nâng cao độ chính xác phân loại.
-
-<p align="center">
-  <img src="./img/Bảng 1.jpg" alt=""/>
-</p>
-
-### 🧩 System Architecture
-```
+```bash
 PhanTichPhanHoi/
-├── __pycache__/
-├── .venv/
 ├── models/
-│   ├── sent_phobert_hybrid_best.pth
-│   └── topic_phobert_gru_best.pth
-├── analyze_demo.html
-├── app.py
-├── data_processing.py
-├── model_classes.py
-└── requirements.txt
+│   ├── sent_phobert_hybrid_best.pth      # Mô hình cảm xúc
+│   └── topic_phobert_gru_best.pth        # Mô hình chủ đề
+├── app.py                                # FastAPI app (REST API)
+├── data_processing.py                    # Load PhoBERT, model, tiền xử lý & suy luận
+├── model_classes.py                      # Định nghĩa kiến trúc CNN–GRU & GRU
+├── analyze_demo.html                     # Giao diện demo (frontend)
+└── requirements.txt                      # Thư viện cần cài đặt
 ```
 
-### ⚙ Installation & Usage
-1️⃣ Create Environment and Install Packages
-   ```shell
-    conda create -n sentiment-dev python=3.9
-   ```
+**Luồng chính:**
 
-   ```shell
-    conda activate sentiment-dev
-   ```
+- `model_classes.py`  
+  - Định nghĩa:
+    - `PhoBERT_CNN_GRU_Sentiment` (3 nhãn cảm xúc).
+    - `PhoBERT_GRU_Topic` (4 nhãn chủ đề).
 
-   ```shell
-    pip install -r requirements.txt
-   ```
-2️⃣ Train Model
-```shell
-python train.py --model phobert-cnn-gru --epochs 10 --lr 0.0001
+- `data_processing.py`  
+  - Load `vinai/phobert-base` và tokenizer.  
+  - Load trọng số từ `models/*.pth`.  
+  - Cung cấp các hàm:
+    - `split_feedback_text(text)`
+    - `predict_feedback(text)`
+    - `analyze_feedback_text(full_text)`
+    - `analyze_many_texts(text_list, batch_size)`
+
+- `app.py`  
+  - Tạo FastAPI app, CORS.  
+  - Endpoint cho phân tích văn bản, file, khảo sát.  
+  - Quản lý cache phân tích và thống kê.
+
+---
+
+## 3. Cài đặt môi trường
+
+```bash
+conda create -n sentiment-dev python=3.9
+conda activate sentiment-dev
+pip install -r requirements.txt
 ```
-3️⃣ Evaluate Model
-```shell
-python evaluate.py --dataset test.csv
+
+`requirements.txt`:
+
+```text
+fastapi
+uvicorn[standard]
+torch
+transformers
+pandas
+scikit-learn
+openpyxl
 ```
-4️⃣ Predict New Feedback
-```shell
-python predict.py --text "Môn học rất thú vị và dễ hiểu"
+
+---
+
+## 4. Chạy API
+
+Từ thư mục `PhanTichPhanHoi`:
+
+```bash
+uvicorn app:app --reload
 ```
-### 🧠 Technologies
-| Component | Description |
-|-------|--------|
-| PHoBERT | Mô hình ngôn ngữ tiền huấn luyện cho tiếng Việt, tạo vector embedding ngữ cảnh. |
+
+- API: `http://127.0.0.1:8000`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+
+---
+
+## 5. Các endpoint chính
+
+### 5.1. Phân tích một đoạn phản hồi
+
+- **URL**: `POST /analyze_text/`  
+- **Body (JSON)**:
+
+```json
+{
+  "text": "Môn học rất hay, nhưng cơ sở vật chất còn kém"
+}
+```
+
+- **Kết quả** (rút gọn):
+
+```json
+{
+  "original_text": "Môn học rất hay, nhưng cơ sở vật chất còn kém",
+  "analysis_parts": [
+    {
+      "part": "Môn học rất hay",
+      "sentiment": "😊 Tích cực",
+      "topic": "📘 Chương trình học"
+    },
+    {
+      "part": "cơ sở vật chất còn kém",
+      "sentiment": "😡 Tiêu cực",
+      "topic": "🏫 Cơ sở vật chất"
+    }
+  ]
+}
+```
+
+---
+
+### 5.2. Phân tích file Excel/CSV
+
+- **URL**: `POST /analyze_file`  
+- **Form-data**:
+  - `file`: file `.xlsx`, `.xls` hoặc `.csv`
+  - `text_column` (mặc định: `"Phản hồi"`)
+  - `student_id_column` (mặc định: `"Mã sinh viên"`)
+  - `batch_size` (mặc định: `64`)
+
+Kết quả:
+
+- `total_rows`: số dòng phản hồi.  
+- `summary.topic_sentiment`: thống kê số câu **pos/neu/neg** theo từng chủ đề.  
+- `rows`: chi tiết từng dòng, kèm `analysis_parts`, `student_id`, `sheet`.
+
+---
+
+### 5.3. Khảo sát sinh viên
+
+- **Gửi khảo sát**: `POST /submit_survey`  
+  - Body: `SurveyResponse` gồm:
+    - `student_id`, `class_name`.
+    - Các câu Likert `q1..q23`.
+    - Các câu mở: `q15_gvcn_improve`, `q20_teacher_improve`, `q24_leader_improve`, `q25_satisfied`, `q26_unsatisfied`, `q27_suggestions`.
+
+- **Thống kê khảo sát**: `GET /survey_stats`  
+  - Trả về:
+    - `total_responses`
+    - `likert_statistics` (average + distribution 1–5)
+    - `open_feedback_analysis` (phân tích AI cho câu mở)
+    - Top chủ đề được khen/chê/đề xuất cải thiện.
+
+- **Lấy toàn bộ bản ghi**: `GET /survey_records`
+
+---
+
+### 5.4. Kiểm tra trạng thái server
+
+- **URL**: `GET /health`  
+- **Trả về**:
+
+```json
+{
+  "status": "ok",
+  "device": "cpu"
+}
+```
+
+(hoặc `"cuda:0"` nếu chạy được trên GPU)
+
+---
+
+## 6. Công nghệ sử dụng
+
+- **FastAPI**: xây dựng REST API phân tích phản hồi.  
+- **PyTorch** + **Transformers (PHoBERT)**: mô hình hoá ngôn ngữ và học sâu.  
+- **CNN + GRU**: phân tích cảm xúc.  
+- **GRU**: phân tích chủ đề.  
+- **Pandas, OpenPyXL**: đọc và xử lý Excel/CSV.  
+
+---
+
+## 7. Hướng phát triển
+
+- Mở rộng thêm lớp cảm xúc (rất tích cực, hơi tiêu cực,…).  
+- Tối ưu mô hình cho dữ liệu chuyên ngành từng khoa.  
+- Tích hợp trực tiếp với LMS để phân tích phản hồi theo thời gian thực.  
+- Xây dựng dashboard trực quan cho phòng đào tạo / ban giám hiệu.
